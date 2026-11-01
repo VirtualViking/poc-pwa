@@ -1,0 +1,50 @@
+# Compila la PoC en modo de compatibilidad (Wasm + respaldo JS) y la publica en GitHub Pages con HTTPS.
+name: Publicar PoC en GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  compilar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Compilar (Wasm + JS)
+        run: |
+          chmod +x gradlew   # el permiso de ejecución se pierde si se sube desde Windows
+          ./gradlew :webApp:composeCompatibilityBrowserDistribution --no-daemon --console=plain
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: webApp/build/dist/composeWebCompatibility/productionExecutable
+
+  publicar:
+    needs: compilar
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
+    steps:
+      - id: despliegue
+        uses: actions/deploy-pages@v5
